@@ -72,14 +72,40 @@ function updateQuote() {
 document.getElementById('auth-form').onsubmit = async (e) => {
     e.preventDefault();
     if (!auth) return alert("Configura Firebase primero.");
-    const email = document.getElementById('email').value;
+    const email = document.getElementById('email').value.trim();
     const password = document.getElementById('password').value;
-    const isSignup = document.getElementById('auth-title').innerText.includes("Registro");
+    const isSignup = document.getElementById('auth-title').innerText.includes("Crea");
+
+    const btn = document.getElementById('auth-btn');
+    const originalText = btn.innerText;
+    btn.innerText = "Cargando...";
+    btn.disabled = true;
 
     try {
-        if (isSignup) await auth.createUserWithEmailAndPassword(email, password);
-        else await auth.signInWithEmailAndPassword(email, password);
-    } catch (err) { alert(err.message); }
+        if (isSignup) {
+            await auth.createUserWithEmailAndPassword(email, password);
+            console.log("Usuario registrado con éxito");
+        } else {
+            await auth.signInWithEmailAndPassword(email, password);
+            console.log("Inicio de sesión exitoso");
+        }
+    } catch (err) {
+        console.error("Error de Firebase:", err.code, err.message);
+        let mensaje = "Error: ";
+        if (err.code === 'auth/invalid-credential') {
+            mensaje += "Credenciales inválidas. Si te estás registrando, asegúrate de que el usuario no exista. Si estás entrando, revisa tu correo y clave.";
+        } else if (err.code === 'auth/email-already-in-use') {
+            mensaje += "Este correo ya está registrado. Intenta iniciar sesión.";
+        } else if (err.code === 'auth/weak-password') {
+            mensaje += "La contraseña es muy corta (mínimo 6 caracteres).";
+        } else {
+            mensaje += err.message;
+        }
+        alert(mensaje);
+    } finally {
+        btn.innerText = originalText;
+        btn.disabled = false;
+    }
 };
 
 document.getElementById('switch-to-signup').onclick = () => {
