@@ -145,14 +145,27 @@ if (auth) {
 }
 
 async function checkUserProfile() {
-    const doc = await db.collection('users').doc(currentUser.uid).get();
-    if (doc.exists) {
-        userData = doc.data();
-        document.getElementById('display-weight').innerText = userData.currentWeight;
-        document.getElementById('display-goal').innerText = userData.goalWeight;
-        showView('dashboard-section');
-    } else {
-        showView('config-section');
+    console.log("Comprobando perfil para:", currentUser.uid);
+    try {
+        const doc = await db.collection('users').doc(currentUser.uid).get();
+        if (doc.exists) {
+            console.log("Perfil encontrado, cargando dashboard");
+            userData = doc.data();
+            document.getElementById('display-weight').innerText = userData.currentWeight;
+            document.getElementById('display-goal').innerText = userData.goalWeight;
+            showView('dashboard-section');
+        } else {
+            console.log("Perfil no encontrado, enviando a configuración");
+            showView('config-section');
+        }
+    } catch (err) {
+        console.error("Error al comprobar perfil:", err);
+        // Si hay un error (ej: permisos), enviamos a config por si acaso o mostramos error
+        if (err.code === 'permission-denied') {
+            alert("Error de permisos en Firestore. Revisa las reglas en la consola de Firebase.");
+        } else {
+            showView('config-section');
+        }
     }
 }
 
