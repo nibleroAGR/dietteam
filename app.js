@@ -83,9 +83,11 @@ document.getElementById('auth-form').onsubmit = async (e) => {
 
     try {
         if (isSignup) {
+            console.log("Intentando REGISTRO para:", email);
             await auth.createUserWithEmailAndPassword(email, password);
             console.log("Usuario registrado con éxito");
         } else {
+            console.log("Intentando LOGIN para:", email);
             await auth.signInWithEmailAndPassword(email, password);
             console.log("Inicio de sesión exitoso");
         }
@@ -108,12 +110,27 @@ document.getElementById('auth-form').onsubmit = async (e) => {
     }
 };
 
-document.getElementById('switch-to-signup').onclick = () => {
+// --- Auth Toggle ---
+const toggleAuth = document.getElementById('toggle-auth');
+const switchToSignup = document.getElementById('switch-to-signup');
+
+function setAuthMode(isSignup) {
     const title = document.getElementById('auth-title');
     const btn = document.getElementById('auth-btn');
-    title.innerText = title.innerText.includes("Bienvenido") ? "Crea tu cuenta" : "Bienvenido a DietTeam";
-    btn.innerText = btn.innerText === "Iniciar Sesión" ? "Registrarse" : "Iniciar Sesión";
-};
+    if (isSignup) {
+        title.innerText = "Crea tu cuenta";
+        btn.innerText = "Registrarse";
+        toggleAuth.innerHTML = '¿Ya tienes cuenta? <span id="switch-to-login" style="color: var(--primary); cursor: pointer; font-weight: 600;">Inicia Sesión</span>';
+        document.getElementById('switch-to-login').onclick = () => setAuthMode(false);
+    } else {
+        title.innerText = "Bienvenido a DietTeam";
+        btn.innerText = "Iniciar Sesión";
+        toggleAuth.innerHTML = '¿No tienes cuenta? <span id="switch-to-signup" style="color: var(--primary); cursor: pointer; font-weight: 600;">Regístrate</span>';
+        document.getElementById('switch-to-signup').onclick = () => setAuthMode(true);
+    }
+}
+
+document.getElementById('switch-to-signup').onclick = () => setAuthMode(true);
 
 if (auth) {
     auth.onAuthStateChanged(user => {
