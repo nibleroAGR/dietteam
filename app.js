@@ -14,7 +14,9 @@ const auth = firebase.auth();
 const db = firebase.firestore();
 
 // --- Phrases (Same as before) ---
+// --- Phrases (50 Motivational Phrases) ---
 const phrases = [
+    // Health (Salud)
     "Tu cuerpo es tu templo, cuídalo con buena comida.",
     "Cada paso cuenta para un corazón más fuerte.",
     "Comer sano no es un castigo, es un regalo para tu futuro.",
@@ -25,17 +27,54 @@ const phrases = [
     "La hidratación es la clave del rendimiento.",
     "Escucha a tu cuerpo, él sabe lo que necesita.",
     "La salud no se trata de lo que pierdes, sino de lo que ganas.",
+    "Mejora tu digestión eligiendo alimentos naturales.",
+    "Un sistema inmune fuerte empieza en tu plato.",
+    "No es una dieta, es un estilo de vida saludable.",
+    "Tu corazón te agradecerá cada elección nutritiva.",
+    "La prevención es la mejor cura.",
+    "Siente la vitalidad de las frutas y verduras.",
+    "Comer bien es una forma de respetarte a ti mismo.",
+
+    // Physical (Físico)
     "La constancia vence a la perfección.",
     "Tus músculos se construyen en la cocina.",
     "Mira al espejo con orgullo por tu esfuerzo diario.",
     "Cada gota de sudor es un paso hacia tu meta.",
+    "No busques resultados rápidos, busca cambios duraderos.",
+    "Tu ropa te quedará mejor, pero tu confianza brillará más.",
+    "Transforma tu cuerpo, transforma tu confianza.",
+    "La disciplina es hacer lo que debes incluso cuando no quieres.",
+    "Tu físico es el reflejo de tus hábitos diarios.",
+    "Pequeños cambios, grandes transformaciones visuales.",
+    "Siente la ligereza de un cuerpo bien alimentado.",
+    "No te compares con otros, compárate con quien fuiste ayer.",
+    "Define tus metas, esculpe tu camino.",
+    "Entrenar es un acto de amor propio.",
+    "Tu postura y tu brillo físico mejoran con cada elección sana.",
+    "La energía que proyectas empieza en lo que consumes.",
+    "Ganar salud es el mejor cambio físico.",
+    "Tu fuerza crece cada vez que dices 'no' a lo que no te hace bien.",
+
+    // Mood (Estado de Ánimo)
     "Mente sana en cuerpo sano.",
     "La comida real mejora tu claridad mental.",
     "Menos azúcar, menos ansiedad.",
     "Siente la dopamina natural de cumplir tus metas.",
+    "Tu estado de ánimo florece con la nutrición adecuada.",
+    "La disciplina te da paz mental.",
     "Eres capaz de mucho más de lo que imaginas.",
-    "Cuidarte te hace sentir increíblemente bien."
-    // ... Simplified for space, would contain all 50 in real impl
+    "Hoy es un gran día para cuidar de ti.",
+    "La calma interior empieza con un cuerpo en equilibrio.",
+    "Sonríe, tu progreso es real y valioso.",
+    "La motivación te pone en marcha, el hábito te mantiene.",
+    "Libera el estrés a través del movimiento.",
+    "Tu confianza crece con cada decisión saludable.",
+    "El optimismo es el mejor condimento para tu comida.",
+    "Cuidarte te hace sentir increíblemente bien.",
+    "Celebra tus victorias, por pequeñas que sean.",
+    "La felicidad se cocina a fuego lento con buenos hábitos.",
+    "Eres el arquitecto de tu propio bienestar.",
+    "Un día a la vez, una comida a la vez, una sonrisa a la vez."
 ];
 
 // --- State ---
@@ -49,11 +88,14 @@ let chatUnsubscribe = null;
 const views = ['auth-section', 'config-section', 'dashboard-section', 'diary-section', 'social-section', 'chat-section'];
 const quoteEl = document.getElementById('motivational-quote');
 
-function showView(viewId) {
+function showView(viewId, isComparison = false) {
     views.forEach(v => document.getElementById(v).classList.add('hidden'));
     document.getElementById(viewId).classList.remove('hidden');
 
-    if (viewId === 'dashboard-section') { updateQuote(); loadWeightData(); }
+    if (viewId === 'dashboard-section') {
+        updateQuote();
+        if (!isComparison) loadWeightData();
+    }
     if (viewId === 'diary-section') loadDiaryData();
     if (viewId === 'social-section') loadFriendsData();
 
@@ -144,6 +186,20 @@ if (auth) {
     });
 }
 
+function updateIMC(weight, height) {
+    if (!weight || !height) return;
+    const heightInMeters = height / 100;
+    const imc = (weight / (heightInMeters * heightInMeters)).toFixed(1);
+    const displayImc = document.getElementById('display-imc');
+    displayImc.innerText = imc;
+
+    // Optional: color based on IMC range
+    if (imc < 18.5) displayImc.style.color = "#3b82f6"; // Blue (Underweight)
+    else if (imc < 25) displayImc.style.color = "#10b981"; // Green (Healthy)
+    else if (imc < 30) displayImc.style.color = "#f59e0b"; // Orange (Overweight)
+    else displayImc.style.color = "#ef4444"; // Red (Obese)
+}
+
 async function checkUserProfile() {
     console.log("Comprobando perfil para:", currentUser.uid);
     try {
@@ -153,6 +209,8 @@ async function checkUserProfile() {
             userData = doc.data();
             document.getElementById('display-weight').innerText = userData.currentWeight;
             document.getElementById('display-goal').innerText = userData.goalWeight;
+            document.getElementById('display-username').innerText = userData.username;
+            updateIMC(userData.currentWeight, userData.height);
             showView('dashboard-section');
         } else {
             console.log("Perfil no encontrado, enviando a configuración");
@@ -204,7 +262,9 @@ document.getElementById('weight-form').onsubmit = async (e) => {
         date: firebase.firestore.FieldValue.serverTimestamp()
     });
     await db.collection('users').doc(currentUser.uid).update({ currentWeight: weight });
+    userData.currentWeight = weight; // Update local state
     document.getElementById('display-weight').innerText = weight;
+    updateIMC(weight, userData.height);
     document.getElementById('weight-form').reset();
     loadWeightData();
 };
@@ -311,18 +371,55 @@ async function loadFriendsData() {
 }
 
 window.compareWeight = async (friendId, friendName) => {
-    const snapSelf = await db.collection('weight_history').doc(currentUser.uid).collection('entries')
-        .orderBy('date', 'desc').limit(10).get();
-    const snapFriend = await db.collection('weight_history').doc(friendId).collection('entries')
-        .orderBy('date', 'desc').limit(10).get();
+    // Show view first with comparison flag to avoid overwrite
+    showView('dashboard-section', true);
 
-    const labels = snapSelf.docs.reverse().map(d => d.data().date ? d.data().date.toDate().toLocaleDateString() : 'Hoy');
+    const snapSelf = await db.collection('weight_history').doc(currentUser.uid).collection('entries')
+        .orderBy('date', 'desc').limit(15).get();
+    const snapFriend = await db.collection('weight_history').doc(friendId).collection('entries')
+        .orderBy('date', 'desc').limit(15).get();
+
+    // Organize data by date string
+    const allData = {};
+    const selfEntries = snapSelf.docs.map(d => d.data());
+    const friendEntries = snapFriend.docs.map(d => d.data());
+
+    selfEntries.forEach(e => {
+        const date = e.date ? e.date.toDate().toLocaleDateString() : 'Hoy';
+        if (!allData[date]) allData[date] = {};
+        allData[date].self = e.weight;
+    });
+
+    friendEntries.forEach(e => {
+        const date = e.date ? e.date.toDate().toLocaleDateString() : 'Hoy';
+        if (!allData[date]) allData[date] = {};
+        allData[date].friend = e.weight;
+    });
+
+    // Sort labels by actual date order (simplified: use keys from latest to oldest then reverse)
+    const labels = Object.keys(allData).sort((a, b) => new Date(a) - new Date(b));
+    const selfData = labels.map(l => allData[l].self || null);
+    const friendData = labels.map(l => allData[l].friend || null);
+
     const datasets = [
-        { label: 'Tú', data: snapSelf.docs.map(d => d.data().weight), borderColor: '#10b981', backgroundColor: 'rgba(16, 185, 129, 0.1)', fill: true, tension: 0.4 },
-        { label: friendName, data: snapFriend.docs.reverse().map(d => d.data().weight), borderColor: '#6b7280', tension: 0.4 }
+        {
+            label: 'Tú',
+            data: selfData,
+            borderColor: '#10b981',
+            backgroundColor: 'rgba(16, 185, 129, 0.1)',
+            fill: true,
+            tension: 0.4,
+            spanGaps: true
+        },
+        {
+            label: friendName,
+            data: friendData,
+            borderColor: '#6b7280',
+            tension: 0.4,
+            spanGaps: true
+        }
     ];
 
-    showView('dashboard-section');
     renderChart(labels, datasets);
 };
 
