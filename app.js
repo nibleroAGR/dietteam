@@ -313,9 +313,20 @@ async function loadDashboardUpdates() {
             }
         }
 
+        const quotes = [
+            "Tu salud es tu mayor riqueza. 🌟",
+            "Cada pequeño paso cuenta. ✨",
+            "No dejes para mañana lo que puedes empezar hoy. 💪",
+            "Tu único límite eres tú mismo. 🚀",
+            "La constancia es la clave del éxito. 🗝️",
+            "Celebra cada pequeño logro. 🎉",
+            "Eres más fuerte de lo que crees. 🔋"
+        ];
+
         updates.sort((a, b) => b.ts - a.ts);
         if (updates.length === 0) {
-            contentEl.innerHTML = '<span style="color: var(--text-muted);">Todo tranquilo en tu círculo... 🍃</span>';
+            const randomQuote = quotes[Math.floor(Math.random() * quotes.length)];
+            contentEl.innerHTML = `<span style="color: var(--primary-dark); font-style: italic;">"${randomQuote}"</span>`;
             return;
         }
 
