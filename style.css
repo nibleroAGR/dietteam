@@ -1,17 +1,51 @@
 :root {
-    --primary: #10b981;
-    /* Emerald Green */
-    --primary-hover: #059669;
-    --secondary: #34d399;
-    --bg: #f3f4f6;
-    /* Modern Light Gray */
-    --card-bg: #ffffff;
-    --text: #111827;
-    /* Dark Slate Grey */
-    --text-muted: #6b7280;
-    --border: #e5e7eb;
-    --glass: rgba(255, 255, 255, 0.8);
-    --glass-border: rgba(0, 0, 0, 0.05);
+    --primary: #2dd4bf;
+    --primary-light: #99f6e4;
+    --primary-dark: #0f766e;
+    --secondary: #fbbf24;
+    --accent: #c084fc;
+    --bg: #f8fafc;
+    --card-bg: rgba(255, 255, 255, 0.95);
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --border: #e2e8f0;
+    --glass: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.3);
+    --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+}
+
+body.dark {
+    --bg: #0b0f19; /* Midnight Premium (Deep Blue/Black) */
+    --card-bg: rgba(20, 27, 41, 0.7); /* Translucent dark glass */
+    --text: #f1f5f9;
+    --text-muted: #94a3b8;
+    --border: #1e293b;
+    --glass: rgba(11, 15, 25, 0.8);
+    --glass-border: rgba(255, 255, 255, 0.08);
+}
+
+/* Dark Mode Overrides for Dashboard */
+body.dark .stat-card {
+    background: var(--card-bg) !important; /* Override inline white */
+    border-color: var(--glass-border) !important;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+}
+
+body.dark .stat-value {
+    color: var(--text) !important;
+}
+
+body.dark #display-username {
+    background: linear-gradient(135deg, white 0%, #cbd5e1 100%) !important;
+    -webkit-background-clip: text !important;
+    -webkit-text-fill-color: transparent !important;
+    color: white !important; /* Fallback */
+}
+
+body.dark .quote-card {
+    background: rgba(16, 185, 129, 0.1);
+    color: #34d399;
+    border-color: rgba(16, 185, 129, 0.2);
 }
 
 * {
@@ -224,11 +258,22 @@ header {
     color: var(--primary);
 }
 
+.food-info {
+    display: flex;
+    flex-direction: column;
+}
+
+.food-meta {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
 .food-item {
     display: flex;
     justify-content: space-between;
+    align-items: center;
     padding: 12px 0;
-    border-bottom: 1px solid #f3f4f6;
+    border-bottom: 1px solid #f1f5f9;
 }
 
 .food-item:last-child {
@@ -359,4 +404,24 @@ header {
 .send-btn {
     width: 50px;
     flex-shrink: 0;
+}
+
+
+.badge-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.badge {
+    padding: 6px 12px;
+    border-radius: 50px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    background: var(--accent);
+    color: white;
+}
+
 }

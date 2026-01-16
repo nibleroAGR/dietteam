@@ -8,8 +8,261 @@
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <style>
+        /* Comparison Grid Styles */
+        .comparison-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .comp-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            text-align: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .comp-row.header {
+            font-weight: 800;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            border-bottom: 2px solid #f0f0f0;
+        }
+
+        .comp-row:last-child {
+            border-bottom: none;
+        }
+
+        .col-name {
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-dark);
+        }
+
+        .col-val {
+            font-weight: 500;
+        }
+
+        .text-primary {
+            color: var(--primary);
+        }
+
+        .text-purple {
+            color: #c084fc;
+        }
+
+        /* Dashboard Redesign */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 25px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 16px;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-icon {
+            width: 42px;
+            height: 42px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.4rem;
+            flex-shrink: 0;
+        }
+
+        .stat-label {
+            display: block;
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
+
+        .btn-danger {
+            background: #ef4444 !important;
+            color: white !important;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626 !important;
+        }
+
+        .stat-value {
+            font-family: 'Outfit', sans-serif;
+            font-weight: 800;
+            font-size: 1.4rem;
+            color: var(--text-dark);
+            line-height: 1;
+        }
+
+        .stat-value .unit {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        .dash-welcome {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-bottom: 25px;
+            padding: 0 5px;
+        }
+
+        /* Calendar & Habits Styles */
+        .habits-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .habit-btn {
+            background: rgba(255, 255, 255, 0.5);
+            /* Light mode default */
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 10px 5px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .habit-btn.active {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+            transform: scale(1.05);
+            box-shadow: 0 4px 10px rgba(16, 185, 129, 0.3);
+        }
+
+        .habit-btn span {
+            font-size: 1.2rem;
+        }
+
+        .habit-btn label {
+            font-size: 0.65rem;
+            margin: 0;
+            cursor: pointer;
+            color: inherit;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 0 5px;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            text-align: center;
+        }
+
+        .cal-day-name {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .cal-day {
+            aspect-ratio: 1;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            padding-top: 5px;
+            font-size: 0.8rem;
+            position: relative;
+            cursor: pointer;
+            border: 1px solid transparent;
+        }
+
+        .cal-day:hover {
+            background: rgba(255, 255, 255, 0.8);
+        }
+
+        .cal-day.today {
+            border-color: var(--primary);
+            background: rgba(16, 185, 129, 0.1);
+        }
+
+        .cal-day.selected {
+            background: var(--primary);
+            color: white !important;
+        }
+
+        .cal-day.selected .cal-icons {
+            filter: brightness(0) invert(1);
+            /* Make icons white if needed, or handle via JS */
+        }
+
+        .cal-cals {
+            font-size: 0.65rem;
+            font-weight: 700;
+            margin-top: auto;
+            margin-bottom: 4px;
+        }
+
+        .cal-icons {
+            display: flex;
+            gap: 2px;
+            font-size: 0.6rem;
+            margin-top: 2px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* Dark Mode Overrides for Calendar */
+        body.dark .habit-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: var(--border);
+        }
+
+        body.dark .habit-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        body.dark .cal-day {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        body.dark .cal-day:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+    </style>
 </head>
 
 <body>
@@ -36,8 +289,12 @@
         <!-- Initial Config Section -->
         <section id="config-section" class="view hidden">
             <div class="card">
-                <h1>Configuración Inicial</h1>
+                <h1>Tu Transformación</h1>
                 <form id="config-form">
+                    <div class="input-group">
+                        <label for="username">Nombre de Usuario</label>
+                        <input type="text" id="username" required placeholder="Tu alias único">
+                    </div>
                     <div class="input-group">
                         <label for="weight">Peso Actual (kg)</label>
                         <input type="number" id="current-weight" step="0.1" required>
@@ -47,37 +304,61 @@
                         <input type="number" id="height" required>
                     </div>
                     <div class="input-group">
-                        <label for="goal">Meta de Peso (kg)</label>
+                        <label for="goal">Meta de Bienestar (kg)</label>
                         <input type="number" id="goal-weight" step="0.1" required>
                     </div>
-                    <button type="submit">Guardar y Empezar</button>
+                    <button type="submit">Empezar mi Transformación</button>
                 </form>
             </div>
         </section>
 
         <!-- Dashboard Section -->
         <section id="dashboard-section" class="view hidden">
-            <header>
-                <div class="user-stats">
-                    <div class="stat">
-                        <span class="label">Actual</span>
-                        <span id="display-weight">--</span> kg
-                    </div>
-                    <div class="stat">
-                        <span class="label">Meta</span>
-                        <span id="display-goal">--</span> kg
-                    </div>
-                    <div class="stat">
-                        <span class="label">IMC</span>
-                        <span id="display-imc">--</span>
-                    </div>
-                    <div class="stat">
-                        <span class="label">Usuario</span>
-                        <span id="display-username">--</span>
+            <header class="dash-welcome" style="margin-bottom: 15px;">
+                <h1 id="display-username" style="margin: 0; font-size: 2.5rem; color: #4b5563; font-weight: 800;">--
+                </h1>
+            </header>
+            <div id="updates-content" style="margin-bottom: 20px; font-size: 0.9rem; text-align: center; height: 24px;">
+            </div>
+
+            <div class="stats-grid">
+                <!-- Current Weight -->
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">⚖️</div>
+                    <div>
+                        <span class="stat-label">Peso Actual</span>
+                        <div class="stat-value"><span id="display-weight">--</span> <span class="unit">kg</span></div>
                     </div>
                 </div>
-                <button id="logout-btn">Salir</button>
-            </header>
+
+                <!-- Goal -->
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">🎯</div>
+                    <div>
+                        <span class="stat-label">Meta</span>
+                        <div class="stat-value"><span id="display-goal">--</span> <span class="unit">kg</span></div>
+                    </div>
+                </div>
+
+                <!-- Weight Loss (Prominent) -->
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">✨</div>
+                    <div>
+                        <span class="stat-label">Progreso</span>
+                        <div class="stat-value"><span id="display-weight-loss">--</span> <span class="unit">kg</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- IMC -->
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">📊</div>
+                    <div>
+                        <span class="stat-label">IMC Actual</span>
+                        <div class="stat-value"><span id="display-imc">--</span></div>
+                    </div>
+                </div>
+            </div>
 
             <div class="quote-card">
                 <p id="motivational-quote">"Tu salud es tu mayor riqueza."</p>
@@ -91,46 +372,63 @@
                 </form>
             </div>
 
+
             <div class="card chart-container">
                 <canvas id="weightChart"></canvas>
             </div>
 
+
+
+
             <nav class="bottom-nav">
-                <button id="nav-dashboard" class="active">Dashboard</button>
-                <button id="nav-diary">Diario</button>
-                <button id="nav-social">Social</button>
+                <button id="nav-dashboard" class="active">Panel</button>
+                <button id="nav-diary">Nutrición</button>
+                <button id="nav-social">Comunidad</button>
+                <button id="nav-profile">Perfil</button>
             </nav>
         </section>
 
         <!-- Food Diary Section -->
         <section id="diary-section" class="view hidden">
-            <h1>Diario de Comidas</h1>
+            <header style="display: flex; justify-content: space-between; align-items: center;">
+                <h1>Nutrición Consciente</h1>
+                <div class="stat-mini">
+                    <span class="label">Media Diaria</span>
+                    <span id="display-daily-avg">--</span> kcal
+                </div>
+            </header>
 
             <div class="card">
                 <form id="food-form">
                     <input type="text" id="food-name" placeholder="¿Qué has comido?" required>
-                    <input type="number" id="food-calories" placeholder="Calorías aprox." required>
+                    <input type="number" id="food-calories" placeholder="Calorías approx." required>
                     <button type="submit">Añadir</button>
                 </form>
+                <div id="quick-add-container" class="quick-add-grid" style="margin-top: 15px;">
+                    <!-- Frequent foods will appear here -->
+                </div>
             </div>
 
             <div class="card">
-                <h3>Comas de hoy</h3>
+                <h3>Comidas de <span id="today-date-str"></span>hoy</span></h3>
                 <div id="food-list"></div>
                 <div class="total-calories">
                     Total Hoy: <span id="total-cals">0</span> kcal
                 </div>
             </div>
 
+            <!-- History List (Restored) -->
             <div class="card">
-                <h3>Historial (2 semanas)</h3>
+                <h3>Historial (últimos 14 días)</h3>
                 <div id="history-list"></div>
             </div>
 
+
             <nav class="bottom-nav">
-                <button id="nav-dashboard-2">Dashboard</button>
-                <button id="nav-diary-2" class="active">Diario</button>
-                <button id="nav-social-2">Social</button>
+                <button id="nav-dashboard-2">Panel</button>
+                <button id="nav-diary-2" class="active">Nutrición</button>
+                <button id="nav-social-2">Comunidad</button>
+                <button id="nav-profile-2">Perfil</button>
             </nav>
         </section>
 
@@ -140,21 +438,34 @@
 
             <div class="card">
                 <h3>Añadir Amigo</h3>
-                <form id="friend-form">
+                <form id="friend-form" style="display:flex; flex-direction: column; gap:10px;">
                     <input type="text" id="friend-username" placeholder="Nombre de usuario" required>
-                    <button type="submit">Añadir</button>
+                    <button type="submit">Enviar Solicitud</button>
                 </form>
             </div>
 
+            <div id="requests-section" class="card">
+                <h3>Solicitudes Pendientes</h3>
+                <div id="requests-list"></div>
+            </div>
+
+
             <div class="card">
-                <h3>Tus Amigos</h3>
+                <h3>Mis Amigos</h3>
                 <div id="friends-list"></div>
             </div>
 
+            <div class="card" style="margin-top: 20px;">
+                <h3>Ranking de Pérdida</h3>
+                <div id="ranking-list"></div>
+            </div>
+
+
             <nav class="bottom-nav">
-                <button id="nav-dashboard-3">Dashboard</button>
-                <button id="nav-diary-3">Diario</button>
-                <button id="nav-social-3" class="active">Social</button>
+                <button id="nav-dashboard-3">Panel</button>
+                <button id="nav-diary-3">Nutrición</button>
+                <button id="nav-social-3" class="active">Comunidad</button>
+                <button id="nav-profile-3">Perfil</button>
             </nav>
         </section>
 
@@ -172,6 +483,88 @@
                     <button type="submit" class="send-btn">➤</button>
                 </form>
             </div>
+        </section>
+
+        <!-- Comparison Section -->
+        <section id="comparison-section" class="view hidden">
+            <header>
+                <button id="back-to-social-comp" class="icon-btn">←</button>
+                <h3 id="comparison-title">Comparativa</h3>
+            </header>
+
+            <div class="card chart-container" style="height: 400px;">
+                <canvas id="comparisonChart"></canvas>
+            </div>
+
+            <div class="card" style="margin-top: 15px;">
+                <div class="comparison-grid" id="comp-stats-container">
+                    <!-- Header Row -->
+                    <div class="comp-row header">
+                        <div class="col-name">Métrica</div>
+                        <div class="col-val text-primary">Tú</div>
+                        <div class="col-val text-purple" id="comp-friend-name">Amigo</div>
+                    </div>
+                    <!-- Stats Rows will be injected here -->
+                </div>
+            </div>
+        </section>
+        <!-- Profile Section -->
+        <section id="profile-section" class="view hidden">
+            <h1>Mi Perfil</h1>
+
+            <div class="card">
+                <h3>Configuración Personal</h3>
+                <form id="profile-settings-form">
+                    <div class="input-group">
+                        <label>Nombre de Usuario</label>
+                        <input type="text" id="setting-username" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Peso Actual (kg)</label>
+                        <input type="number" id="setting-current-weight" step="0.1" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Estatura (cm)</label>
+                        <input type="number" id="setting-height" required>
+                    </div>
+                    <div class="input-group">
+                        <label>Meta (kg)</label>
+                        <input type="number" id="setting-goal" step="0.1" required>
+                    </div>
+                    <button type="submit">Guardar Cambios</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>Ajustes de la App</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <span>Modo Noche</span>
+                    <label class="switch">
+                        <input type="checkbox" id="night-mode-toggle">
+                        <span class="slider round"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Gestionar Amigos</h3>
+                <div id="profile-friends-list"></div>
+            </div>
+
+            <div class="card" style="border: 1px solid #fee2e2; background: #fffafb;">
+                <h3 style="color: #991b1b;">Cuenta</h3>
+                <p style="font-size: 0.8rem; color: #b91c1c; margin-bottom: 15px;">Sesión iniciada como <span
+                        id="profile-email">--</span></p>
+                <button id="logout-btn-2" style="background: #ef4444; color: white;" onclick="logout()">Cerrar
+                    Sesión</button>
+            </div>
+
+            <nav class="bottom-nav">
+                <button id="nav-dashboard-4">Panel</button>
+                <button id="nav-diary-4">Nutrición</button>
+                <button id="nav-social-4">Comunidad</button>
+                <button id="nav-profile-4" class="active">Perfil</button>
+            </nav>
         </section>
     </div>
 
