@@ -605,6 +605,7 @@ async function loadFriendsData() {
         }
     });
     loadRanking();
+    loadCommunityChart();
 }
 
 async function loadRanking() {
@@ -829,3 +830,98 @@ function setupNavigation() {
     if (bC) bC.onclick = () => showView('social-section');
 }
 setupNavigation();
+
+async function loadCommunityChart() {
+    const canvas = document.getElementById('communityChart');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+
+    try {
+        const getEntries = async (uid) => {
+            const snap = await db.collection('weight_history').doc(uid).collection('entries').orderBy('date', 'desc').limit(15).get();
+            return snap.docs.map(d => ({
+                weight: d.data().weight,
+                date: d.data().date ? d.data().date.toDate() : new Date()
+            }));
+        };
+
+        let datasets = [];
+        const colors = ['#10b981', '#3b82f6', '#f59e0b', '#6366f1', '#ec4899', '#8b5cf6', '#06b6d4'];
+
+        // My data
+        const myEntries = await getEntries(currentUser.uid);
+        datasets.push({
+            label: 'Tú',
+            data: myEntries,
+            borderColor: colors[0],
+            backgroundColor: colors[0] + '22',
+            tension: 0.4,
+            spanGaps: true
+        });
+
+        // Friends data
+        const fSnap = await db.collection('friendships').where('users', 'array-contains', currentUser.uid).get();
+        let colorIdx = 1;
+        for (const doc of fSnap.docs) {
+            const f = doc.data();
+            if (f.status === 'accepted') {
+                const fId = f.users[f.users.indexOf(currentUser.uid) === 0 ? 1 : 0];
+                const fName = f.usernames[f.users.indexOf(currentUser.uid) === 0 ? 1 : 0];
+                const fEntries = await getEntries(fId);
+                if (fEntries.length > 0) {
+                    datasets.push({
+                        label: fName,
+                        data: fEntries,
+                        borderColor: colors[colorIdx % colors.length],
+                        backgroundColor: colors[colorIdx % colors.length] + '22',
+                        tension: 0.4,
+                        spanGaps: true
+                    });
+                    colorIdx++;
+                }
+            }
+        }
+
+        // Consolidation of dates for axis X
+        const allDatesSet = new Set();
+        datasets.forEach(ds => ds.data.forEach(e => allDatesSet.add(e.date.toLocaleDateString())));
+        const sortedLabels = Array.from(allDatesSet).sort((a, b) => {
+            const parse = (s) => {
+                const parts = s.split('/');
+                return new Date(parts[2], parts[1] - 1, parts[0]);
+            };
+            return parse(a) - parse(b);
+        });
+
+        // Map data to sorted labels
+        datasets.forEach(ds => {
+            const entryMap = new Map(ds.data.map(e => [e.date.toLocaleDateString(), e.weight]));
+            ds.data = sortedLabels.map(label => entryMap.get(label) || null);
+        });
+
+        if (window.commChart) window.commChart.destroy();
+        window.commChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: sortedLabels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { usePointStyle: true, boxWidth: 6, font: { size: 10 } }
+                    }
+                },
+                scales: {
+                    y: { ticks: { font: { size: 10 } } },
+                    x: { ticks: { font: { size: 10 } } }
+                }
+            }
+        });
+    } catch (e) {
+        console.error("Error loading community chart", e);
+    }
+}
