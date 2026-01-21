@@ -84,7 +84,7 @@ let activeChatFriendId = null;
 let chatUnsubscribe = null;
 
 // --- DOM ---
-const views = ['auth-section', 'config-section', 'dashboard-section', 'diary-section', 'social-section', 'chat-section', 'comparison-section', 'profile-section'];
+const views = ['auth-section', 'config-section', 'dashboard-section', 'diary-section', 'social-section', 'feed-section', 'chat-section', 'comparison-section', 'profile-section'];
 const quoteEl = document.getElementById('motivational-quote');
 
 function showView(viewId, isComparison = false) {
@@ -104,7 +104,6 @@ function showView(viewId, isComparison = false) {
     }
     if (viewId === 'diary-section') {
         loadDiaryData();
-        updateQuickAddDisplay();
         updateDailyAverage();
         document.querySelectorAll('[id^=nav-diary]').forEach(b => b.classList.add('active'));
     }
@@ -112,9 +111,13 @@ function showView(viewId, isComparison = false) {
         loadFriendsData();
         document.querySelectorAll('[id^=nav-social]').forEach(b => b.classList.add('active'));
     }
+    if (viewId === 'feed-section') {
+        loadFeedData();
+        document.querySelectorAll('[id^=nav-feed]').forEach(b => b.classList.add('active'));
+    }
     if (viewId === 'profile-section') {
         loadProfileData();
-        document.querySelectorAll('[id^=nav-profile]').forEach(b => b.classList.add('active'));
+        // No bottom nav active for profile
     }
 
     if (chatUnsubscribe && viewId !== 'chat-section') {
@@ -190,7 +193,7 @@ function setAuthMode(isSignup) {
             if (loginSwitch) loginSwitch.onclick = () => setAuthMode(false);
         }
     } else {
-        if (title) title.innerText = "Bienvenido a DietTeam";
+        if (title) title.innerText = "Bienvenido a DietFy";
         if (btn) btn.innerText = "Iniciar Sesión";
         if (toggleAuth) {
             toggleAuth.innerHTML = '¿No tienes cuenta? <span id="switch-to-signup" style="color: var(--primary); cursor: pointer; font-weight: 600;">Regístrate</span>';
@@ -460,19 +463,66 @@ async function updateDailyAverage() {
     if (el) el.innerText = avg;
 }
 
-function updateQuickAddDisplay() {
-    const container = document.getElementById('quick-add-container');
+function updateSuggestionsDisplay() {
+    const container = document.getElementById('suggestions-list');
     if (!container) return;
     const foods = userData.frequentFoods || [];
-    if (foods.length === 0) { container.innerHTML = ''; return; }
-    container.innerHTML = '<p style="font-size: 0.75rem; color: var(--text-muted); margin-bottom: 8px;">Sugerencias:</p>' +
-        foods.map(f => `<button class="quick-add-chip" onclick="quickAddFood('${f.name}', ${f.calories})">${f.name} (${f.calories})</button>`).join('');
+    if (foods.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 20px;">No hay sugerencias aún. Añade comidas para generar sugerencias personalizadas.</p>';
+        return;
+    }
+    container.innerHTML = foods.map((f, index) => `
+        <div class="suggestion-item">
+            <div class="suggestion-info">
+                <div class="suggestion-name">${f.name}</div>
+                <div class="suggestion-calories">${f.calories} kcal</div>
+            </div>
+            <div class="suggestion-actions">
+                <button class="btn-add" onclick="addFromSuggestion('${f.name.replace(/'/g, "\\'")}', ${f.calories})">+ Añadir</button>
+                <button class="btn-delete" onclick="deleteSuggestion(${index})">🗑️</button>
+            </div>
+        </div>
+    `).join('');
 }
 
-window.quickAddFood = async (name, calories) => {
+// Show/Hide suggestions
+const showSuggestionsBtn = document.getElementById('show-suggestions-btn');
+const closeSuggestionsBtn = document.getElementById('close-suggestions-btn');
+const suggestionsCard = document.getElementById('suggestions-card');
+
+if (showSuggestionsBtn) {
+    showSuggestionsBtn.onclick = () => {
+        if (suggestionsCard) {
+            suggestionsCard.classList.remove('hidden');
+            updateSuggestionsDisplay();
+        }
+    };
+}
+
+if (closeSuggestionsBtn) {
+    closeSuggestionsBtn.onclick = () => {
+        if (suggestionsCard) suggestionsCard.classList.add('hidden');
+    };
+}
+
+window.addFromSuggestion = async (name, calories) => {
     await db.collection('food_diary').doc(currentUser.uid).collection('entries').add({
         name: name, calories: calories, date: firebase.firestore.FieldValue.serverTimestamp()
     });
+    loadDiaryData();
+    updateDailyAverage();
+};
+
+window.deleteSuggestion = async (index) => {
+    if (!confirm('¿Eliminar esta sugerencia?')) return;
+    userData.frequentFoods.splice(index, 1);
+    await db.collection('users').doc(currentUser.uid).update({ frequentFoods: userData.frequentFoods });
+    updateSuggestionsDisplay();
+};
+
+window.deleteFoodEntry = async (docId) => {
+    if (!confirm('¿Eliminar esta comida?')) return;
+    await db.collection('food_diary').doc(currentUser.uid).collection('entries').doc(docId).delete();
     loadDiaryData();
     updateDailyAverage();
 };
@@ -490,9 +540,8 @@ if (foodForm) {
         const exists = userData.frequentFoods.find(f => f.name.toLowerCase() === name.toLowerCase());
         if (!exists) {
             userData.frequentFoods.unshift({ name, calories });
-            if (userData.frequentFoods.length > 6) userData.frequentFoods.pop();
+            if (userData.frequentFoods.length > 10) userData.frequentFoods.pop();
             await db.collection('users').doc(currentUser.uid).update({ frequentFoods: userData.frequentFoods });
-            updateQuickAddDisplay();
         }
         foodForm.reset();
         loadDiaryData();
@@ -518,7 +567,17 @@ async function loadDiaryData() {
         const itemDate = item.date.toDate();
         if (itemDate >= startOfToday) {
             totalToday += item.calories;
-            if (listToday) listToday.innerHTML += `<div class="food-item"><span>${item.name}</span><span>${item.calories} kcal</span></div>`;
+            if (listToday) {
+                listToday.innerHTML += `
+                    <div class="food-item-with-delete">
+                        <div class="food-item-info">
+                            <span>${item.name}</span>
+                            <span>${item.calories} kcal</span>
+                        </div>
+                        <button class="food-item-delete" onclick="deleteFoodEntry('${doc.id}')">🗑️</button>
+                    </div>
+                `;
+            }
         } else {
             const dateKey = itemDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
             historyGroups[dateKey] = (historyGroups[dateKey] || 0) + item.calories;
@@ -533,6 +592,7 @@ async function loadDiaryData() {
         if (Object.keys(historyGroups).length === 0) listHistory.innerHTML = '<p style="font-size: 0.8rem; color: var(--text-muted); text-align: center;">Sin historial reciente.</p>';
     }
 }
+
 
 // --- Social ---
 const friendForm = document.getElementById('friend-form');
@@ -816,9 +876,264 @@ if (profileForm) {
 
 window.logout = () => { if (auth) auth.signOut(); window.location.reload(); };
 
+// --- Social Feed Logic ---
+
+let selectedPostImage = null; // Base64 string
+
+async function loadFeedData() {
+    const feedContainer = document.getElementById('feed-container');
+    feedContainer.innerHTML = '<p style="text-align:center;color:gray;">Cargando muro...</p>';
+
+    try {
+        // 1. Get friend list IDs + my ID
+        const myFriendsSnapshot = await db.collection('users').doc(auth.currentUser.uid).collection('friends').get();
+        const allowedUserIds = [auth.currentUser.uid];
+        myFriendsSnapshot.forEach(doc => allowedUserIds.push(doc.id));
+
+        // 2. Fetch posts (Order by date desc)
+        // Note: Firestore 'in' query supports up to 10/30 items. For simplicity in this demo, we fetch recent 50 posts and filter client-side if needed, 
+        // OR better: we fetch posts where 'userId' is in 'allowedUserIds'.
+        // To avoid index issues with complex queries without generating indexes, we'll try a simple approach:
+        // Fetch all recent posts from 'posts' collection and filter in JS (Not scalable for millions, fine for MVPs).
+
+        const postsSnapshot = await db.collection('posts').orderBy('timestamp', 'desc').limit(50).get();
+
+        const posts = [];
+        postsSnapshot.forEach(doc => {
+            const p = doc.data();
+            p.id = doc.id;
+            if (allowedUserIds.includes(p.userId)) {
+                posts.push(p);
+            }
+        });
+
+        if (posts.length === 0) {
+            feedContainer.innerHTML = '<p style="text-align:center;color:gray; padding:20px;">No hay publicaciones recientes. ¡Sé el primero!</p>';
+            return;
+        }
+
+        feedContainer.innerHTML = posts.map(post => renderPost(post)).join('');
+
+    } catch (error) {
+        console.error("Error loading feed:", error);
+        feedContainer.innerHTML = '<p style="text-align:center;color:red;">Error cargando el muro.</p>';
+    }
+}
+
+function renderPost(post) {
+    const isLiked = post.likes && post.likes.includes(auth.currentUser.uid);
+    const likeCount = post.likes ? post.likes.length : 0;
+    const comments = post.comments || [];
+
+    // Formatting timestamp
+    let timeAgo = 'Justo ahora';
+    if (post.timestamp) {
+        const date = post.timestamp.toDate();
+        const diff = (new Date() - date) / 1000 / 60; // minutes
+        if (diff < 60) timeAgo = `${Math.floor(diff)} min`;
+        else if (diff < 1440) timeAgo = `${Math.floor(diff / 60)} h`;
+        else timeAgo = date.toLocaleDateString();
+    }
+
+    const isOwner = post.userId === auth.currentUser.uid;
+
+    return `
+    <div class="card post-card" id="post-${post.id}">
+        <div class="post-header">
+            <div class="post-avatar">${post.username.charAt(0).toUpperCase()}</div>
+            <div class="post-meta">
+                <h4>${post.username}</h4>
+                <span>${timeAgo}</span>
+            </div>
+            ${isOwner ? `<button onclick="deletePost('${post.id}')" style="margin-left:auto; background:none; color:#ef4444; border:none; padding:5px;">🗑️</button>` : ''}
+        </div>
+        <div class="post-content">
+            ${post.text}
+        </div>
+        ${post.imageUrl ? `<img src="${post.imageUrl}" class="post-image" alt="Post content">` : ''}
+        
+        <div class="post-actions">
+            <button class="action-btn ${isLiked ? 'liked' : ''}" onclick="toggleLike('${post.id}')">
+                ${isLiked ? '❤️' : '🤍'} ${likeCount > 0 ? likeCount : 'Me gusta'}
+            </button>
+            <button class="action-btn" onclick="document.getElementById('comment-input-${post.id}').focus()">
+                💬 Comentar
+            </button>
+        </div>
+
+        <div class="comments-section">
+            ${comments.map(c => `
+                <div class="comment">
+                    <strong>${c.username}</strong> ${c.text}
+                </div>
+            `).join('')}
+            
+            <div class="comment-form">
+                <input type="text" id="comment-input-${post.id}" placeholder="Escribe un comentario..." style="flex:1; border:1px solid #ddd; border-radius:20px;">
+                <button onclick="addComment('${post.id}')" style="background:var(--primary); color:white; border-radius:20px;">Enviar</button>
+            </div>
+        </div>
+    </div>
+    `;
+}
+
+async function deletePost(postId) {
+    if (!confirm('¿Estás seguro de que quieres eliminar esta publicación?')) return;
+    try {
+        await db.collection('posts').doc(postId).delete();
+        document.getElementById(`post-${postId}`).remove();
+    } catch (error) {
+        console.error("Error deleting post:", error);
+        alert("Error al eliminar.");
+    }
+}
+
+async function createPost(e) {
+    e.preventDefault();
+    const text = document.getElementById('post-text').value.trim();
+    if (!text && !selectedPostImage) return;
+
+    try {
+        await db.collection('posts').add({
+            userId: auth.currentUser.uid,
+            username: userData.username || 'Usuario',
+            text: text,
+            imageUrl: selectedPostImage, // Base64 or null
+            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+            likes: [],
+            comments: []
+        });
+
+        // Reset form
+        document.getElementById('create-post-form').reset();
+        selectedPostImage = null;
+        document.getElementById('preview-container').classList.add('hidden');
+        loadFeedData(); // Refresh feed
+    } catch (error) {
+        console.error("Error creating post:", error);
+        alert("Error al publicar.");
+    }
+}
+
+async function toggleLike(postId) {
+    const postRef = db.collection('posts').doc(postId);
+    const doc = await postRef.get();
+    if (!doc.exists) return;
+
+    const data = doc.data();
+    let likes = data.likes || [];
+    const uid = auth.currentUser.uid;
+
+    if (likes.includes(uid)) {
+        likes = likes.filter(id => id !== uid);
+    } else {
+        likes.push(uid);
+    }
+
+    await postRef.update({ likes });
+    loadFeedData(); // Refresh specific post is better but full reload is easier for sync
+}
+
+async function addComment(postId) {
+    const input = document.getElementById(`comment-input-${postId}`);
+    const text = input.value.trim();
+    if (!text) return;
+
+    const postRef = db.collection('posts').doc(postId);
+    const doc = await postRef.get();
+    if (!doc.exists) return;
+
+    const comments = doc.data().comments || [];
+    comments.push({
+        userId: auth.currentUser.uid,
+        username: userData.username || 'Usuario',
+        text: text,
+        timestamp: new Date()
+    });
+
+    await postRef.update({ comments });
+    loadFeedData(); // Refresh to show comment
+}
+
+// Image handling
+document.getElementById('btn-add-photo').addEventListener('click', () => {
+    document.getElementById('post-image-input').click();
+});
+
+document.getElementById('post-image-input').addEventListener('change', function (e) {
+    const file = e.target.files[0];
+    if (file) {
+        compressImage(file, 800, 0.7).then(compressedBase64 => {
+            selectedPostImage = compressedBase64;
+            const preview = document.getElementById('image-preview');
+            preview.src = selectedPostImage;
+            document.getElementById('preview-container').classList.remove('hidden');
+        }).catch(err => {
+            console.error("Error comprimiendo imagen:", err);
+            alert("No se pudo procesar la imagen.");
+        });
+    }
+});
+
+function compressImage(file, maxWidth, quality) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = event => {
+            const img = new Image();
+            img.src = event.target.result;
+            img.onload = () => {
+                const elem = document.createElement('canvas');
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxWidth) {
+                    height *= maxWidth / width;
+                    width = maxWidth;
+                }
+
+                elem.width = width;
+                elem.height = height;
+                const ctx = elem.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+                resolve(ctx.toDataURL('image/jpeg', quality));
+            };
+            img.onerror = error => reject(error);
+        };
+        reader.onerror = error => reject(error);
+    });
+}
+
+document.getElementById('remove-image-btn').addEventListener('click', () => {
+    selectedPostImage = null;
+    document.getElementById('post-image-input').value = '';
+    document.getElementById('preview-container').classList.add('hidden');
+});
+
+document.getElementById('create-post-form').addEventListener('submit', createPost);
+
+// Share Chart Feature
+document.getElementById('btn-share-chart').addEventListener('click', () => {
+    // If we are not on dashboard, we might need to load chart first or grab it.
+    // Assuming user wants to share their Weight Chart.
+    // It's rendered on canvas id="weightChart".
+    // We'll temporarily switch to dashboard to make sure it's rendered? No, that's jarring.
+    // If weightChart instance exists (Chart.js), we can use toBase64Image().
+
+    if (weightChart) {
+        selectedPostImage = weightChart.toBase64Image();
+        const preview = document.getElementById('image-preview');
+        preview.src = selectedPostImage;
+        document.getElementById('preview-container').classList.remove('hidden');
+        document.getElementById('post-text').value = `¡Mirad mi progreso! He perdido ${document.getElementById('display-weight-loss').innerText} kg 💪`;
+    } else {
+        alert("El gráfico aún no se ha cargado. Ve al panel principal primero.");
+    }
+});
+
 // --- Navigation ---
 function setupNavigation() {
-    const navs = ['dashboard', 'diary', 'social', 'profile'];
+    const navs = ['dashboard', 'diary', 'social', 'feed'];
     navs.forEach(s => {
         document.querySelectorAll(`[id^=nav-${s}]`).forEach(b => {
             b.onclick = () => showView(`${s}-section`);

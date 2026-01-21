@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DietTeam - Tu Compañero de Salud</title>
+    <title>DietFy - Tu Compañero de Salud</title>
     <link rel="stylesheet" href="style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -270,7 +270,10 @@
         <!-- Login / Signup Section -->
         <section id="auth-section" class="view">
             <div class="card">
-                <h1 id="auth-title">Bienvenido a DietTeam</h1>
+                <div class="logo-container" style="text-align: center; margin-bottom: 30px;">
+                    <img src="logo.png" alt="DietFy Logo" style="width: 120px; height: 120px; margin-bottom: 10px;">
+                </div>
+                <h1 id="auth-title" style="text-align: center;">Bienvenido a DietFy</h1>
                 <form id="auth-form">
                     <div class="input-group">
                         <label for="email">Email</label>
@@ -314,9 +317,18 @@
 
         <!-- Dashboard Section -->
         <section id="dashboard-section" class="view hidden">
-            <header class="dash-welcome" style="margin-bottom: 15px;">
-                <h1 id="display-username" style="margin: 0; font-size: 2.5rem; color: #4b5563; font-weight: 800;">--
-                </h1>
+            <header class="dash-welcome"
+                style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h1 id="display-username" style="margin: 0; font-size: 2.2rem; color: #4b5563; font-weight: 800;">--
+                    </h1>
+                </div>
+                <button id="top-nav-profile" class="icon-btn profile-top-btn" onclick="showView('profile-section')">
+                    <div
+                        style="background: var(--primary); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.2rem; box-shadow: 0 4px 10px rgba(45, 212, 191, 0.3);">
+                        👤
+                    </div>
+                </button>
             </header>
             <div id="updates-content" style="margin-bottom: 20px; font-size: 0.9rem; text-align: center; height: 24px;">
             </div>
@@ -379,20 +391,36 @@
 
 
             <nav class="bottom-nav">
-                <button id="nav-dashboard" class="active">Panel</button>
-                <button id="nav-diary">Nutrición</button>
-                <button id="nav-social">Comunidad</button>
-                <button id="nav-profile">Perfil</button>
+                <button id="nav-dashboard" class="active" title="Panel">
+                    <span style="font-size: 1.5rem;">🏠</span>
+                </button>
+                <button id="nav-diary" title="Nutrición">
+                    <span style="font-size: 1.5rem;">🥗</span>
+                </button>
+                <button id="nav-social" title="Comunidad">
+                    <span style="font-size: 1.5rem;">👥</span>
+                </button>
+                <button id="nav-feed" title="Social">
+                    <span style="font-size: 1.5rem;">📸</span>
+                </button>
             </nav>
         </section>
 
         <!-- Food Diary Section -->
         <section id="diary-section" class="view hidden">
-            <header style="display: flex; justify-content: space-between; align-items: center;">
-                <h1>Nutrición Consciente</h1>
-                <div class="stat-mini">
-                    <span class="label">Media Diaria</span>
-                    <span id="display-daily-avg">--</span> kcal
+            <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h1 style="margin:0; font-size: 1.5rem;">Nutrición</h1>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <div class="stat-mini">
+                        <span id="display-daily-avg" style="font-weight: 800; color: var(--primary);">--</span> kcal/día
+                    </div>
+                    <button id="top-nav-profile-2" class="icon-btn profile-top-btn"
+                        onclick="showView('profile-section')">
+                        <div
+                            style="background: var(--primary); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.2rem; box-shadow: 0 4px 10px rgba(45, 212, 191, 0.3);">
+                            👤
+                        </div>
+                    </button>
                 </div>
             </header>
 
@@ -402,8 +430,23 @@
                     <input type="number" id="food-calories" placeholder="Calorías approx." required>
                     <button type="submit">Añadir</button>
                 </form>
-                <div id="quick-add-container" class="quick-add-grid" style="margin-top: 15px;">
-                    <!-- Frequent foods will appear here -->
+                <button id="show-suggestions-btn" type="button"
+                    style="margin-top: 15px; width: 100%; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; padding: 12px; border-radius: 12px; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                    📚 Ver Sugerencias
+                </button>
+            </div>
+
+            <!-- Suggestions Modal/Card -->
+            <div id="suggestions-card" class="card hidden" style="max-height: 400px; overflow-y: auto;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <h3 style="margin: 0;">📚 Libro de Sugerencias</h3>
+                    <button id="close-suggestions-btn" type="button"
+                        style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 8px; cursor: pointer; font-weight: 600;">
+                        ✕ Cerrar
+                    </button>
+                </div>
+                <div id="suggestions-list" class="suggestions-grid">
+                    <!-- Suggestions will appear here -->
                 </div>
             </div>
 
@@ -423,16 +466,32 @@
 
 
             <nav class="bottom-nav">
-                <button id="nav-dashboard-2">Panel</button>
-                <button id="nav-diary-2" class="active">Nutrición</button>
-                <button id="nav-social-2">Comunidad</button>
-                <button id="nav-profile-2">Perfil</button>
+                <button id="nav-dashboard-2" title="Panel">
+                    <span style="font-size: 1.5rem;">🏠</span>
+                </button>
+                <button id="nav-diary-2" class="active" title="Nutrición">
+                    <span style="font-size: 1.5rem;">🥗</span>
+                </button>
+                <button id="nav-social-2" title="Comunidad">
+                    <span style="font-size: 1.5rem;">👥</span>
+                </button>
+                <button id="nav-feed-2" title="Social">
+                    <span style="font-size: 1.5rem;">📸</span>
+                </button>
             </nav>
         </section>
 
         <!-- Social Section -->
         <section id="social-section" class="view hidden">
-            <h1>Comunidad</h1>
+            <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h1 style="margin:0;">Comunidad</h1>
+                <button id="top-nav-profile-3" class="icon-btn profile-top-btn" onclick="showView('profile-section')">
+                    <div
+                        style="background: var(--primary); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.2rem; box-shadow: 0 4px 10px rgba(45, 212, 191, 0.3);">
+                        👤
+                    </div>
+                </button>
+            </header>
 
             <div class="card">
                 <h3>Añadir Amigo</h3>
@@ -465,10 +524,18 @@
 
 
             <nav class="bottom-nav">
-                <button id="nav-dashboard-3">Panel</button>
-                <button id="nav-diary-3">Nutrición</button>
-                <button id="nav-social-3" class="active">Comunidad</button>
-                <button id="nav-profile-3">Perfil</button>
+                <button id="nav-dashboard-3" title="Panel">
+                    <span style="font-size: 1.5rem;">🏠</span>
+                </button>
+                <button id="nav-diary-3" title="Nutrición">
+                    <span style="font-size: 1.5rem;">🥗</span>
+                </button>
+                <button id="nav-social-3" class="active" title="Comunidad">
+                    <span style="font-size: 1.5rem;">👥</span>
+                </button>
+                <button id="nav-feed-3" title="Social">
+                    <span style="font-size: 1.5rem;">📸</span>
+                </button>
             </nav>
         </section>
 
@@ -511,6 +578,68 @@
                 </div>
             </div>
         </section>
+        <!-- NEW FEED SECTION -->
+        <section id="feed-section" class="view hidden">
+            <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px;">
+                <h1 style="margin:0;">Muro Social</h1>
+                <button id="top-nav-profile-5" class="icon-btn profile-top-btn" onclick="showView('profile-section')">
+                    <div
+                        style="background: var(--primary); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 1.2rem; box-shadow: 0 4px 10px rgba(45, 212, 191, 0.3);">
+                        👤
+                    </div>
+                </button>
+            </header>
+
+            <!-- Create Post Card -->
+            <div class="card"
+                style="background: linear-gradient(135deg, #fff 0%, #f0fdf4 100%); border: 2px solid var(--primary-light);">
+                <h3 style="margin-bottom: 10px;">Crear Publicación</h3>
+                <form id="create-post-form">
+                    <textarea id="post-text" placeholder="¿Qué estás pensando? Comparte tus logros..."
+                        style="width: 100%; border: 1px solid var(--border); border-radius: 12px; padding: 12px; font-family: inherit; resize: none; margin-bottom: 10px;"
+                        rows="3"></textarea>
+
+                    <!-- Hidden file input for images -->
+                    <input type="file" id="post-image-input" accept="image/*" style="display: none;">
+
+                    <div id="preview-container" class="hidden" style="position: relative; margin-bottom: 10px;">
+                        <img id="image-preview" src=""
+                            style="width: 100%; border-radius: 12px; max-height: 200px; object-fit: cover;">
+                        <button type="button" id="remove-image-btn"
+                            style="position: absolute; top: 5px; right: 5px; background: rgba(0,0,0,0.6); color: white; border-radius: 50%; width: 24px; height: 24px; padding: 0;">✕</button>
+                    </div>
+
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" id="btn-add-photo"
+                            style="background: #f3f4f6; color: var(--text); flex: 1;">📷 Foto</button>
+                        <button type="button" id="btn-share-chart"
+                            style="background: #e0e7ff; color: #4338ca; flex: 1;">📈 Gráfica</button>
+                    </div>
+                    <button type="submit" style="margin-top: 10px;">Publicar</button>
+                </form>
+            </div>
+
+            <!-- Feed Container -->
+            <div id="feed-container" style="display: flex; flex-direction: column; gap: 20px; padding-bottom: 20px;">
+                <!-- Posts will be injected here -->
+            </div>
+
+            <nav class="bottom-nav">
+                <button id="nav-dashboard-5" title="Panel">
+                    <span style="font-size: 1.5rem;">🏠</span>
+                </button>
+                <button id="nav-diary-5" title="Nutrición">
+                    <span style="font-size: 1.5rem;">🥗</span>
+                </button>
+                <button id="nav-social-5" title="Comunidad">
+                    <span style="font-size: 1.5rem;">👥</span>
+                </button>
+                <button id="nav-feed-5" class="active" title="Social">
+                    <span style="font-size: 1.5rem;">📸</span>
+                </button>
+            </nav>
+        </section>
+
         <!-- Profile Section -->
         <section id="profile-section" class="view hidden">
             <h1>Mi Perfil</h1>
@@ -563,10 +692,18 @@
             </div>
 
             <nav class="bottom-nav">
-                <button id="nav-dashboard-4">Panel</button>
-                <button id="nav-diary-4">Nutrición</button>
-                <button id="nav-social-4">Comunidad</button>
-                <button id="nav-profile-4" class="active">Perfil</button>
+                <button id="nav-dashboard-4" title="Panel">
+                    <span style="font-size: 1.5rem;">🏠</span>
+                </button>
+                <button id="nav-diary-4" title="Nutrición">
+                    <span style="font-size: 1.5rem;">🥗</span>
+                </button>
+                <button id="nav-social-4" title="Comunidad">
+                    <span style="font-size: 1.5rem;">👥</span>
+                </button>
+                <button id="nav-feed-4" title="Social">
+                    <span style="font-size: 1.5rem;">📸</span>
+                </button>
             </nav>
         </section>
     </div>
