@@ -288,6 +288,8 @@ async function loadDashboardUpdates() {
             }
         });
 
+        const friendIdSet = new Set(friendIds.map(f => f.id));
+
         for (const friend of friendIds) {
             const msgSnap = await db.collection('friendships').doc(friend.docId).collection('messages').orderBy('timestamp', 'desc').limit(1).get();
             if (!msgSnap.empty) {
@@ -314,7 +316,37 @@ async function loadDashboardUpdates() {
                     });
                 }
             }
+
+            // Food Check
+            const fSnap = await db.collection('food_diary').doc(friend.id).collection('entries').orderBy('date', 'desc').limit(1).get();
+            if (!fSnap.empty) {
+                const fData = fSnap.docs[0].data();
+                if (fData.date && fData.date.toDate() > cutoff) {
+                    updates.push({
+                        type: 'food',
+                        text: `🥗 <b>${friend.name}</b> comió ${fData.name}`,
+                        ts: fData.date.toDate()
+                    });
+                }
+            }
         }
+
+        // Posts Check (Global recent filtered by friends)
+        try {
+            // We use limit 20 to avoid large reads, assuming recent activity is what matters
+            const postsSnap = await db.collection('posts').orderBy('timestamp', 'desc').limit(20).get();
+            postsSnap.forEach(doc => {
+                const p = doc.data();
+                if (friendIdSet.has(p.userId) && p.timestamp && p.timestamp.toDate() > cutoff) {
+                    const friendName = friendIds.find(f => f.id === p.userId)?.name || p.username;
+                    updates.push({
+                        type: 'post',
+                        text: `📸 <b>${friendName}</b> publicó en el muro`,
+                        ts: p.timestamp.toDate()
+                    });
+                }
+            });
+        } catch (e) { console.error("Error fetching posts for marquee", e); }
 
         const quotes = [
             "Tu salud es tu mayor riqueza. 🌟",
@@ -1056,9 +1088,8 @@ async function addComment(postId) {
 }
 
 // Image handling
-document.getElementById('btn-add-photo').addEventListener('click', () => {
-    document.getElementById('post-image-input').click();
-});
+// Image handling
+// Button click removed (handled by label for=post-image-input)
 
 document.getElementById('post-image-input').addEventListener('change', function (e) {
     const file = e.target.files[0];

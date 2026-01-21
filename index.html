@@ -451,7 +451,7 @@
             </div>
 
             <div class="card">
-                <h3>Comidas de <span id="today-date-str"></span>hoy</span></h3>
+                <h3>Comidas de hoy, <span id="today-date-str"></span></h3>
                 <div id="food-list"></div>
                 <div class="total-calories">
                     Total Hoy: <span id="total-cals">0</span> kcal
@@ -610,8 +610,9 @@
                     </div>
 
                     <div style="display: flex; gap: 10px;">
-                        <button type="button" id="btn-add-photo"
-                            style="background: #f3f4f6; color: var(--text); flex: 1;">📷 Foto</button>
+                        <label for="post-image-input" id="btn-add-photo"
+                            style="background: #f3f4f6; color: var(--text); flex: 1; border-radius: 12px; padding: 14px; font-size: 1rem; font-weight: 600; cursor: pointer; text-align: center; display: block; margin-bottom: 0;">📷
+                            Foto</label>
                         <button type="button" id="btn-share-chart"
                             style="background: #e0e7ff; color: #4338ca; flex: 1;">📈 Gráfica</button>
                     </div>
@@ -667,16 +668,7 @@
                 </form>
             </div>
 
-            <div class="card">
-                <h3>Ajustes de la App</h3>
-                <div style="display: flex; justify-content: space-between; align-items: center;">
-                    <span>Modo Noche</span>
-                    <label class="switch">
-                        <input type="checkbox" id="night-mode-toggle">
-                        <span class="slider round"></span>
-                    </label>
-                </div>
-            </div>
+
 
             <div class="card">
                 <h3>Gestionar Amigos</h3>
