@@ -1094,14 +1094,23 @@ async function addComment(postId) {
 document.getElementById('post-image-input').addEventListener('change', function (e) {
     const file = e.target.files[0];
     if (file) {
+        const btn = document.getElementById('btn-add-photo');
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '⏳ Procesando...';
+        btn.style.opacity = '0.7';
+
         compressImage(file, 800, 0.7).then(compressedBase64 => {
             selectedPostImage = compressedBase64;
             const preview = document.getElementById('image-preview');
             preview.src = selectedPostImage;
             document.getElementById('preview-container').classList.remove('hidden');
+            btn.innerHTML = originalText;
+            btn.style.opacity = '1';
         }).catch(err => {
             console.error("Error comprimiendo imagen:", err);
             alert("No se pudo procesar la imagen.");
+            btn.innerHTML = originalText;
+            btn.style.opacity = '1';
         });
     }
 });
