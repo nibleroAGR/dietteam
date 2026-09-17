@@ -13,51 +13,6 @@ firebase.initializeApp(firebaseConfig);
 const auth = firebase.auth();
 const db = firebase.firestore();
 
-// =====================================================================
-// CIFRADO ZERO-KNOWLEDGE — Gestión de la Clave Maestra
-// =====================================================================
-// La clave maestra NUNCA se guarda en Firestore ni se envía a ningún
-// servidor. Vive solo en sessionStorage del navegador (se borra al
-// cerrar la pestaña) y se usa localmente para cifrar/descifrar con
-// cryptoUtils.js (window.crypto.subtle, AES-256-GCM).
-//
-// IMPORTANTE: como DietFy comparte datos entre amigos (chat, muro,
-// ranking, comparativas), esta clave es una CONTRASEÑA COMPARTIDA por
-// tu grupo/equipo (todos los que quieran verse entre sí deben usar la
-// misma). Esto protege tus datos frente a Firebase/Google y frente a
-// una fuga de la base de datos, pero NO es un secreto individual e
-// intransferible por usuario. Ver la explicación completa en la guía.
-const MASTER_KEY_SESSION_NAME = 'dietfy_master_key';
-
-function getMasterKey() {
-    return sessionStorage.getItem(MASTER_KEY_SESSION_NAME);
-}
-function setMasterKey(key) {
-    sessionStorage.setItem(MASTER_KEY_SESSION_NAME, key);
-}
-function clearMasterKey() {
-    sessionStorage.removeItem(MASTER_KEY_SESSION_NAME);
-}
-
-async function ensureMasterKey() {
-    let key = getMasterKey();
-    while (!key) {
-        key = window.prompt(
-            '🔒 Introduce la Clave de Cifrado / Contraseña Maestra de DietFy.\n' +
-            'Debe ser la MISMA que usan tus amigos para que podáis veros entre vosotros.\n' +
-            'Esta clave nunca se envía a ningún servidor.'
-        );
-        if (key === null) {
-            alert('Necesitas la clave de cifrado para poder usar DietFy.');
-            continue;
-        }
-        key = key.trim();
-        if (!key) key = null;
-    }
-    setMasterKey(key);
-    return key;
-}
-
 // --- Phrases (50 Motivational Phrases) ---
 const phrases = [
     // Health (Salud)
@@ -252,14 +207,12 @@ const signupSwitchInit = document.getElementById('switch-to-signup');
 if (signupSwitchInit) signupSwitchInit.onclick = () => setAuthMode(true);
 
 if (auth) {
-    auth.onAuthStateChanged(async user => {
+    auth.onAuthStateChanged(user => {
         if (user) {
             currentUser = user;
-            await ensureMasterKey(); // Pide/recupera la clave ANTES de tocar datos cifrados
             checkUserProfile();
         } else {
             currentUser = null;
-            clearMasterKey(); // Limpia la clave de la sesión al cerrar sesión
             showView('auth-section');
         }
     });
@@ -287,15 +240,6 @@ async function checkUserProfile() {
         if (doc.exists) {
             console.log("Perfil encontrado, cargando dashboard");
             userData = doc.data();
-            const masterKey = getMasterKey();
-            // Descifrado local: Firestore solo guardaba Base64 ilegible
-            userData.currentWeight = await cryptoUtils.decryptNumber(userData.currentWeight, masterKey);
-            userData.height = await cryptoUtils.decryptNumber(userData.height, masterKey);
-            userData.goalWeight = await cryptoUtils.decryptNumber(userData.goalWeight, masterKey);
-            try {
-                userData.frequentFoods = JSON.parse(await cryptoUtils.decryptData(userData.frequentFoods, masterKey) || '[]');
-            } catch (e) { userData.frequentFoods = []; }
-
             const wEl = document.getElementById('display-weight');
             const gEl = document.getElementById('display-goal');
             const uEl = document.getElementById('display-username');
@@ -378,10 +322,9 @@ async function loadDashboardUpdates() {
             if (!fSnap.empty) {
                 const fData = fSnap.docs[0].data();
                 if (fData.date && fData.date.toDate() > cutoff) {
-                    const foodName = await cryptoUtils.decryptData(fData.name, getMasterKey());
                     updates.push({
                         type: 'food',
-                        text: `🥗 <b>${friend.name}</b> comió ${foodName}`,
+                        text: `🥗 <b>${friend.name}</b> comió ${fData.name}`,
                         ts: fData.date.toDate()
                     });
                 }
@@ -449,24 +392,19 @@ if (configForm) {
         const userSnap = await db.collection('users').where('username', '==', username).get();
         if (!userSnap.empty) return alert("Este nombre de usuario ya está en uso.");
 
-        const masterKey = getMasterKey();
-        const currentWeight = parseFloat(document.getElementById('current-weight').value);
-        const height = parseInt(document.getElementById('height').value);
-        const goalWeight = parseFloat(document.getElementById('goal-weight').value);
-
         const data = {
-            username: username, // Plaintext: necesario para el where('username','==',...) de arriba
-            currentWeight: await cryptoUtils.encryptNumber(currentWeight, masterKey),
-            height: await cryptoUtils.encryptNumber(height, masterKey),
-            goalWeight: await cryptoUtils.encryptNumber(goalWeight, masterKey),
+            username: username,
+            currentWeight: parseFloat(document.getElementById('current-weight').value),
+            height: parseInt(document.getElementById('height').value),
+            goalWeight: parseFloat(document.getElementById('goal-weight').value),
             uid: currentUser.uid,
             badges: [],
-            frequentFoods: await cryptoUtils.encryptData(JSON.stringify([]), masterKey)
+            frequentFoods: []
         };
 
         await db.collection('users').doc(currentUser.uid).set(data);
         await db.collection('weight_history').doc(currentUser.uid).collection('entries').add({
-            weight: await cryptoUtils.encryptNumber(currentWeight, masterKey),
+            weight: data.currentWeight,
             date: firebase.firestore.FieldValue.serverTimestamp()
         });
         checkUserProfile();
@@ -477,7 +415,7 @@ async function calculateTotalWeightLoss() {
     try {
         const snapshot = await db.collection('weight_history').doc(currentUser.uid).collection('entries').orderBy('date', 'asc').limit(1).get();
         if (snapshot.empty) return;
-        const initialWeight = await cryptoUtils.decryptNumber(snapshot.docs[0].data().weight, getMasterKey());
+        const initialWeight = snapshot.docs[0].data().weight;
         const currentWeight = userData.currentWeight;
         const diff = currentWeight - initialWeight;
         const el = document.getElementById('display-weight-loss');
@@ -496,14 +434,11 @@ if (weightForm) {
     weightForm.onsubmit = async (e) => {
         e.preventDefault();
         const weight = parseFloat(document.getElementById('new-weight').value);
-        const masterKey = getMasterKey();
         await db.collection('weight_history').doc(currentUser.uid).collection('entries').add({
-            weight: await cryptoUtils.encryptNumber(weight, masterKey),
+            weight: weight,
             date: firebase.firestore.FieldValue.serverTimestamp()
         });
-        await db.collection('users').doc(currentUser.uid).update({
-            currentWeight: await cryptoUtils.encryptNumber(weight, masterKey)
-        });
+        await db.collection('users').doc(currentUser.uid).update({ currentWeight: weight });
         userData.currentWeight = weight;
         const wEl = document.getElementById('display-weight');
         if (wEl) wEl.innerText = weight;
@@ -515,18 +450,15 @@ if (weightForm) {
 }
 
 async function loadWeightData() {
-    const masterKey = getMasterKey();
     const snapshot = await db.collection('weight_history').doc(currentUser.uid).collection('entries').orderBy('date', 'desc').limit(10).get();
-    const docsAsc = snapshot.docs.reverse();
-    const weights = await Promise.all(docsAsc.map(d => cryptoUtils.decryptNumber(d.data().weight, masterKey)));
     const datasets = [{
         label: 'Tú',
-        data: weights,
+        data: snapshot.docs.reverse().map(d => d.data().weight),
         borderColor: '#10b981',
         backgroundColor: 'rgba(16, 185, 129, 0.1)',
         fill: true, tension: 0.4
     }];
-    const labels = docsAsc.map(d => d.data().date ? d.data().date.toDate().toLocaleDateString() : 'Hoy');
+    const labels = snapshot.docs.map(d => d.data().date ? d.data().date.toDate().toLocaleDateString() : 'Hoy');
     renderChart(labels, datasets);
 }
 
@@ -548,17 +480,15 @@ function renderChart(labels, datasets) {
 
 // --- Nutrition ---
 async function updateDailyAverage() {
-    const masterKey = getMasterKey();
     const snapshot = await db.collection('food_diary').doc(currentUser.uid).collection('entries').get();
     const dailyTotals = {};
-    for (const doc of snapshot.docs) {
+    snapshot.forEach(doc => {
         const data = doc.data();
         if (data.date) {
-            const calories = await cryptoUtils.decryptNumber(data.calories, masterKey);
             const day = data.date.toDate().toLocaleDateString();
-            dailyTotals[day] = (dailyTotals[day] || 0) + calories;
+            dailyTotals[day] = (dailyTotals[day] || 0) + data.calories;
         }
-    }
+    });
     const totals = Object.values(dailyTotals);
     const avg = totals.length > 0 ? (totals.reduce((a, b) => a + b, 0) / totals.length).toFixed(0) : '--';
     const el = document.getElementById('display-daily-avg');
@@ -608,11 +538,8 @@ if (closeSuggestionsBtn) {
 }
 
 window.addFromSuggestion = async (name, calories) => {
-    const masterKey = getMasterKey();
     await db.collection('food_diary').doc(currentUser.uid).collection('entries').add({
-        name: await cryptoUtils.encryptData(name, masterKey),
-        calories: await cryptoUtils.encryptNumber(calories, masterKey),
-        date: firebase.firestore.FieldValue.serverTimestamp()
+        name: name, calories: calories, date: firebase.firestore.FieldValue.serverTimestamp()
     });
     loadDiaryData();
     updateDailyAverage();
@@ -621,9 +548,7 @@ window.addFromSuggestion = async (name, calories) => {
 window.deleteSuggestion = async (index) => {
     if (!confirm('¿Eliminar esta sugerencia?')) return;
     userData.frequentFoods.splice(index, 1);
-    await db.collection('users').doc(currentUser.uid).update({
-        frequentFoods: await cryptoUtils.encryptData(JSON.stringify(userData.frequentFoods), getMasterKey())
-    });
+    await db.collection('users').doc(currentUser.uid).update({ frequentFoods: userData.frequentFoods });
     updateSuggestionsDisplay();
 };
 
@@ -640,20 +565,15 @@ if (foodForm) {
         e.preventDefault();
         const name = document.getElementById('food-name').value.trim();
         const calories = parseInt(document.getElementById('food-calories').value);
-        const masterKey = getMasterKey();
         await db.collection('food_diary').doc(currentUser.uid).collection('entries').add({
-            name: await cryptoUtils.encryptData(name, masterKey),
-            calories: await cryptoUtils.encryptNumber(calories, masterKey),
-            date: firebase.firestore.FieldValue.serverTimestamp()
+            name: name, calories: calories, date: firebase.firestore.FieldValue.serverTimestamp()
         });
         if (!userData.frequentFoods) userData.frequentFoods = [];
         const exists = userData.frequentFoods.find(f => f.name.toLowerCase() === name.toLowerCase());
         if (!exists) {
             userData.frequentFoods.unshift({ name, calories });
             if (userData.frequentFoods.length > 10) userData.frequentFoods.pop();
-            await db.collection('users').doc(currentUser.uid).update({
-                frequentFoods: await cryptoUtils.encryptData(JSON.stringify(userData.frequentFoods), masterKey)
-            });
+            await db.collection('users').doc(currentUser.uid).update({ frequentFoods: userData.frequentFoods });
         }
         foodForm.reset();
         loadDiaryData();
@@ -667,21 +587,16 @@ async function loadDiaryData() {
     const dateEl = document.getElementById('today-date-str');
     if (dateEl) dateEl.innerText = todayStr;
     const startOfToday = new Date(now.setHours(0, 0, 0, 0));
-    const masterKey = getMasterKey();
     const snapshot = await db.collection('food_diary').doc(currentUser.uid).collection('entries').orderBy('date', 'desc').get();
     const listToday = document.getElementById('food-list');
     const listHistory = document.getElementById('history-list');
     if (listToday) listToday.innerHTML = '';
     if (listHistory) listHistory.innerHTML = '';
     let totalToday = 0, historyGroups = {};
-    for (const doc of snapshot.docs) {
-        const raw = doc.data();
-        if (!raw.date) continue;
-        const item = {
-            name: await cryptoUtils.decryptData(raw.name, masterKey),
-            calories: await cryptoUtils.decryptNumber(raw.calories, masterKey)
-        };
-        const itemDate = raw.date.toDate();
+    snapshot.forEach(doc => {
+        const item = doc.data();
+        if (!item.date) return;
+        const itemDate = item.date.toDate();
         if (itemDate >= startOfToday) {
             totalToday += item.calories;
             if (listToday) {
@@ -699,7 +614,7 @@ async function loadDiaryData() {
             const dateKey = itemDate.toLocaleDateString('es-ES', { day: 'numeric', month: 'short' });
             historyGroups[dateKey] = (historyGroups[dateKey] || 0) + item.calories;
         }
-    }
+    });
     const totalEl = document.getElementById('total-cals');
     if (totalEl) totalEl.innerText = totalToday;
     if (listHistory) {
@@ -790,14 +705,11 @@ async function loadRanking() {
     if (!rankingList) return;
     rankingList.innerHTML = '';
     try {
-        const masterKey = getMasterKey();
         let usersData = [];
         const getUserLoss = async (uid) => {
             const s = await db.collection('weight_history').doc(uid).collection('entries').orderBy('date', 'asc').get();
             if (s.empty || s.size < 2) return 0;
-            const first = await cryptoUtils.decryptNumber(s.docs[0].data().weight, masterKey);
-            const last = await cryptoUtils.decryptNumber(s.docs[s.size - 1].data().weight, masterKey);
-            return first - last;
+            return s.docs[0].data().weight - s.docs[s.size - 1].data().weight;
         };
         usersData.push({ name: 'Tú', loss: await getUserLoss(currentUser.uid), isMe: true });
         const fSnap = await db.collection('friendships').where('users', 'array-contains', currentUser.uid).get();
@@ -842,18 +754,15 @@ window.compareWeight = async (friendId, friendName) => {
     if (friendNameEl) friendNameEl.innerText = friendName;
 
     // Load Data
-    const masterKey = getMasterKey();
     const mySnap = await db.collection('weight_history').doc(currentUser.uid).collection('entries').orderBy('date', 'desc').limit(15).get();
     const fSnap = await db.collection('weight_history').doc(friendId).collection('entries').orderBy('date', 'desc').limit(15).get();
 
-    const myEntries = await Promise.all(mySnap.docs.map(async d => ({ weight: await cryptoUtils.decryptNumber(d.data().weight, masterKey), date: d.data().date ? d.data().date.toDate() : new Date() })));
-    const fEntries = await Promise.all(fSnap.docs.map(async d => ({ weight: await cryptoUtils.decryptNumber(d.data().weight, masterKey), date: d.data().date ? d.data().date.toDate() : new Date() })));
+    const myEntries = mySnap.docs.map(d => ({ weight: d.data().weight, date: d.data().date ? d.data().date.toDate() : new Date() }));
+    const fEntries = fSnap.docs.map(d => ({ weight: d.data().weight, date: d.data().date ? d.data().date.toDate() : new Date() }));
 
     // Helper to get friend profile (for goal)
     const fDoc = await db.collection('users').doc(friendId).get();
     const fData = fDoc.data();
-    fData.currentWeight = await cryptoUtils.decryptNumber(fData.currentWeight, masterKey);
-    fData.goalWeight = await cryptoUtils.decryptNumber(fData.goalWeight, masterKey);
 
     // 1. Chart: Sync Dates
     // Combine all dates and sort
@@ -920,16 +829,14 @@ window.startChat = async (friendshipId, friendName) => {
     const msgDiv = document.getElementById('messages-container');
     if (msgDiv) msgDiv.innerHTML = '<p class="text-center" style="opacity:0.5">Cargando...</p>';
     if (chatUnsubscribe) chatUnsubscribe();
-    chatUnsubscribe = db.collection('friendships').doc(friendshipId).collection('messages').orderBy('timestamp', 'asc').onSnapshot(async snap => {
+    chatUnsubscribe = db.collection('friendships').doc(friendshipId).collection('messages').orderBy('timestamp', 'asc').onSnapshot(snap => {
         if (msgDiv) {
-            const masterKey = getMasterKey();
-            const rows = await Promise.all(snap.docs.map(async doc => {
+            msgDiv.innerHTML = '';
+            snap.forEach(doc => {
                 const m = doc.data();
                 const isMe = m.sender === currentUser.uid;
-                const text = await cryptoUtils.decryptData(m.text, masterKey);
-                return `<div class="message ${isMe ? 'msg-me' : 'msg-them'}">${text}</div>`;
-            }));
-            msgDiv.innerHTML = rows.join('');
+                msgDiv.innerHTML += `<div class="message ${isMe ? 'msg-me' : 'msg-them'}">${m.text}</div>`;
+            });
             msgDiv.scrollTop = msgDiv.scrollHeight;
         }
     });
@@ -943,9 +850,7 @@ if (chatForm) {
         const text = input.value.trim();
         if (!text || !activeChatFriendId) return;
         await db.collection('friendships').doc(activeChatFriendId).collection('messages').add({
-            text: await cryptoUtils.encryptData(text, getMasterKey()),
-            sender: currentUser.uid,
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
+            text: text, sender: currentUser.uid, timestamp: firebase.firestore.FieldValue.serverTimestamp()
         });
         input.value = '';
     };
@@ -978,7 +883,6 @@ if (profileForm) {
         const nG = parseFloat(document.getElementById('setting-goal').value);
         if (!nU) return;
         try {
-            const masterKey = getMasterKey();
             const ups = {};
             if (nU !== userData.username) {
                 const check = await db.collection('users').where('username', '==', nU).get();
@@ -986,14 +890,11 @@ if (profileForm) {
                 ups.username = nU;
             }
             if (nW !== userData.currentWeight) {
-                ups.currentWeight = await cryptoUtils.encryptNumber(nW, masterKey);
-                await db.collection('weight_history').doc(currentUser.uid).collection('entries').add({
-                    weight: await cryptoUtils.encryptNumber(nW, masterKey),
-                    date: firebase.firestore.FieldValue.serverTimestamp()
-                });
+                ups.currentWeight = nW;
+                await db.collection('weight_history').doc(currentUser.uid).collection('entries').add({ weight: nW, date: firebase.firestore.FieldValue.serverTimestamp() });
             }
-            if (nH !== userData.height) ups.height = await cryptoUtils.encryptNumber(nH, masterKey);
-            if (nG !== userData.goalWeight) ups.goalWeight = await cryptoUtils.encryptNumber(nG, masterKey);
+            if (nH !== userData.height) ups.height = nH;
+            if (nG !== userData.goalWeight) ups.goalWeight = nG;
             if (Object.keys(ups).length > 0) {
                 await db.collection('users').doc(currentUser.uid).update(ups);
                 const ref = await db.collection('users').doc(currentUser.uid).get();
@@ -1005,7 +906,7 @@ if (profileForm) {
     };
 }
 
-window.logout = () => { clearMasterKey(); if (auth) auth.signOut(); window.location.reload(); };
+window.logout = () => { if (auth) auth.signOut(); window.location.reload(); };
 
 // --- Social Feed Logic ---
 
@@ -1029,21 +930,14 @@ async function loadFeedData() {
 
         const postsSnapshot = await db.collection('posts').orderBy('timestamp', 'desc').limit(50).get();
 
-        const masterKey = getMasterKey();
         const posts = [];
-        for (const doc of postsSnapshot.docs) {
+        postsSnapshot.forEach(doc => {
             const p = doc.data();
             p.id = doc.id;
             if (allowedUserIds.includes(p.userId)) {
-                p.text = await cryptoUtils.decryptData(p.text, masterKey);
-                const comments = p.comments || [];
-                p.comments = await Promise.all(comments.map(async c => ({
-                    ...c,
-                    text: await cryptoUtils.decryptData(c.text, masterKey)
-                })));
                 posts.push(p);
             }
-        }
+        });
 
         if (posts.length === 0) {
             feedContainer.innerHTML = '<p style="text-align:center;color:gray; padding:20px;">No hay publicaciones recientes. ¡Sé el primero!</p>';
@@ -1135,8 +1029,8 @@ async function createPost(e) {
         await db.collection('posts').add({
             userId: auth.currentUser.uid,
             username: userData.username || 'Usuario',
-            text: await cryptoUtils.encryptData(text, getMasterKey()),
-            imageUrl: selectedPostImage, // Base64 or null (ver nota sobre imágenes en la guía)
+            text: text,
+            imageUrl: selectedPostImage, // Base64 or null
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
             likes: [],
             comments: []
@@ -1185,7 +1079,7 @@ async function addComment(postId) {
     comments.push({
         userId: auth.currentUser.uid,
         username: userData.username || 'Usuario',
-        text: await cryptoUtils.encryptData(text, getMasterKey()),
+        text: text,
         timestamp: new Date()
     });
 
@@ -1298,13 +1192,12 @@ async function loadCommunityChart() {
     const ctx = canvas.getContext('2d');
 
     try {
-        const masterKey = getMasterKey();
         const getEntries = async (uid) => {
             const snap = await db.collection('weight_history').doc(uid).collection('entries').orderBy('date', 'desc').limit(15).get();
-            return Promise.all(snap.docs.map(async d => ({
-                weight: await cryptoUtils.decryptNumber(d.data().weight, masterKey),
+            return snap.docs.map(d => ({
+                weight: d.data().weight,
                 date: d.data().date ? d.data().date.toDate() : new Date()
-            })));
+            }));
         };
 
         let datasets = [];
